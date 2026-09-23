@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require("discord.js");
+import type { Command } from "../../types";
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags, type GuildMember } from "discord.js";
 
-module.exports = {
+const command: Command = {
     data: new SlashCommandBuilder()
         .setName("userinfo")
         .setDescription("Show information about a user | ดูข้อมูลผู้ใช้งาน")
@@ -10,22 +11,19 @@ module.exports = {
                 .setDescription("The user to check")
         ),
 
-    /**
-     * @param {import("discord.js").Client} client
-     * @param {import("discord.js").ChatInputCommandInteraction} interaction
-     */
     async run(client, interaction) {
         const user = interaction.options.getUser("target") ?? interaction.user;
-        let member = null;
+        const guild = interaction.guild;
+        let member: GuildMember | null = null;
         try {
-            member = await interaction.guild.members.fetch(user.id);
+            if (guild) member = await guild.members.fetch(user.id);
         } catch {
             member = null;
         }
 
         const createdAt = `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`;
         const joinedAt = member?.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : "Not in server";
-        const roles = member ? member.roles.cache.filter(role => role.id !== interaction.guild.id).map(role => role.toString()).join(" ") || "No Roles" : "No Roles";
+        const roles = member ? member.roles.cache.filter(role => role.id !== guild?.id).map(role => role.toString()).join(" ") || "No Roles" : "No Roles";
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle(`${user.username}'s Information`)
@@ -79,3 +77,4 @@ module.exports = {
         });
     },
 };
+export = command;

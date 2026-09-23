@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, EmbedBuilder } = require("discord.js");
+import type { Command } from "../../types";
+import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, EmbedBuilder } from "discord.js";
 
-module.exports = {
+const command: Command = {
     data: new SlashCommandBuilder()
         .setName("purge")
         .setDescription("Delete messages in a channel | ลบข้อความในช่องแชท")
@@ -14,21 +15,25 @@ module.exports = {
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
-    /**
-     * @param {import("discord.js").Client} client
-     * @param {import("discord.js").Interaction} interaction
-     */
     async run(client, interaction) {
-        const amount = interaction.options.getInteger("amount");
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        const amount = interaction.options.getInteger("amount", true);
+        const channel = interaction.channel;
+        if (!interaction.inGuild() || !channel || !("bulkDelete" in channel)) {
+            return interaction.reply({
+                content: "This command requires a server channel that supports bulk deletion",
+                flags: MessageFlags.Ephemeral,
+            });
+        }
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
             return interaction.reply({
                 content: "You do not have permission to use this command",
                 flags: MessageFlags.Ephemeral,
             });
         }
 
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         try {
-            const messages = await interaction.channel.bulkDelete(amount, true);
+            const messages = await channel.bulkDelete(amount, true);
             const embed = new EmbedBuilder()
                 .setColor(0x2ecc71)
                 .setTitle("Purge Complete")
@@ -46,15 +51,12 @@ module.exports = {
                 )
                 .setTimestamp();
 
-            await interaction.reply({
-                embeds: [embed],
-                flags: MessageFlags.Ephemeral,
-            });
+            await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            await interaction.reply({
+            await interaction.editReply({
                 content: "The message cannot be deleted (the message may be older than 14 days)",
-                flags: MessageFlags.Ephemeral,
             });
         }
     },
 };
+export = command;

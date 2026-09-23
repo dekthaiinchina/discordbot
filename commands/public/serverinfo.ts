@@ -1,24 +1,27 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require("discord.js");
+import type { Command } from "../../types";
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
 
-module.exports = {
+const command: Command = {
     data: new SlashCommandBuilder()
         .setName("serverinfo")
         .setDescription("Show information about the server | ดูข้อมูลเซิร์ฟเวอร์"),
 
-    /**
-     * @param {import("discord.js").Client} client
-     * @param {import("discord.js").ChatInputCommandInteraction} interaction
-     */
     async run(client, interaction) {
         const { guild } = interaction;
+        if (!guild) {
+            return interaction.reply({
+                content: "This command can only be used in a server",
+                flags: MessageFlags.Ephemeral,
+            });
+        }
 
         const createdAt = `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`;
         const owner = await guild.fetchOwner();
         const members = guild.members.cache;
-        
+
         const humans = members.filter(m => !m.user.bot).size;
         const bots = members.filter(m => m.user.bot).size;
-        
+
         const channels = guild.channels.cache;
         const textChannels = channels.filter(c => c.isTextBased()).size;
         const voiceChannels = channels.filter(c => c.isVoiceBased()).size;
@@ -96,3 +99,5 @@ module.exports = {
         });
     },
 };
+
+export = command;

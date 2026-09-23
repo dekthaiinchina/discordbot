@@ -1,271 +1,160 @@
 # Discord Bot
 
-A feature-rich Discord bot built with Discord.js v14 featuring slash commands, event handling, sharding support, and modular architecture.
+A Discord.js v14 bot written in strict TypeScript, with five slash commands, member events, sharding, and command reloading. TypeScript compiles to CommonJS JavaScript in `dist/`.
 
-## Features
+## Requirements
 
-- ✨ Slash Commands with categorization (Public & Admin)
-- 🔄 Event-driven architecture
-- 🚀 Sharding support for scalability
-- 📝 Custom logger with color-coded output
-- 🐳 Docker support for easy deployment
-- ⚙️ Environment-based configuration (Development/Production)
-- 🔒 Permission-based admin commands
+- Node.js 22.12 or newer (Node.js 24 is used by Docker)
+- npm
+- A [Discord bot token](https://discord.com/developers/applications)
 
-## Prerequisites
+## Setup
 
-- Node.js 20 LTS or higher
-- npm or yarn
-- A Discord Bot Token ([Get one here](https://discord.com/developers/applications))
-
-## Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd discordbot
+npm ci
 ```
 
-2. Install dependencies:
+Edit `config.ts` to configure the bot. Set `DISCORD_TOKEN` in the process environment before starting; the default configuration reads it automatically. On Bash:
+
 ```bash
-npm install
-```
-
-3. Configure the bot:
-
-Edit `config.js` and add your bot configuration:
-
-```javascript
-const baseConfig = {
-    token: "YOUR_BOT_TOKEN_HERE",
-    pushcommand: true,              // Auto-deploy commands on startup
-    pushGlobal: true,                // Deploy commands globally (false for specific guilds)
-    guildPushCommand: "",            // Guild IDs for command deployment (if pushGlobal is false)
-    developerId: "YOUR_DEVELOPER_ID",
-    autoRoleId: "AUTO_ROLE_ID",      // Role ID to assign to new members
-    logChannelId: "LOG_CHANNEL_ID",  // Channel ID for logs
-    shard: 1,                        // Number of shards (use "auto" for automatic)
-};
-```
-
-## Usage
-
-### Development Mode
-```bash
+export DISCORD_TOKEN='your-bot-token'
 npm run dev
 ```
 
-### Production Mode
-```bash
-npm run prod
+Do not commit tokens. `.env` is ignored by Git, but the application does not automatically load `.env` files.
+
+The relevant configuration fields are:
+
+```typescript
+const baseConfig: Omit<BotConfig, "intents"> = {
+    version,
+    token: process.env.DISCORD_TOKEN ?? "",
+    pushcommand: true,
+    pushGlobal: true,
+    guildPushCommand: ["YOUR_GUILD_ID"],
+    developerId: "YOUR_DEVELOPER_ID",
+    autoRoleId: "AUTO_ROLE_ID",
+    logChannelId: "LOG_CHANNEL_ID",
+    shard: 1, // Or "auto"
+};
 ```
 
-### Using Docker
+`guildPushCommand` must be an array of complete guild IDs. It is used when `pushGlobal` is false. Empty role and channel IDs disable those optional features. Configure a channel that supports sending messages for member logs. Enable the privileged Guild Members and Message Content intents in the Discord developer portal, since this bot requests them.
 
-1. Build the Docker image:
+## Commands and scripts
+
+| Script | Purpose |
+| --- | --- |
+| `npm run typecheck` | Check application and test types without emitting files |
+| `npm run build` | Remove generated `dist/` files and compile TypeScript |
+| `npm run dev` | Build and start with development logging |
+| `npm run prod` | Build and start in production mode |
+| `npm start` | Start an already compiled production build |
+| `npm test` | Clean build and offline tests using Node's test runner |
+
+Development mode builds once; restart it after source changes. For production, install development dependencies in the build environment, run `npm run build`, and use `npm start` with production dependencies in the runtime environment.
+
+| Slash command | Behavior |
+| --- | --- |
+| `/ping` | Show interaction and WebSocket latency |
+| `/serverinfo` | Show server details; requires a guild |
+| `/userinfo [target]` | Show account and available server membership details |
+| `/purge <amount>` | Delete 1–100 messages; requires Manage Messages and a supported guild channel |
+| `/reload` | Reload compiled command modules in the current shard; restricted to `developerId` |
+
+`/reload` reads JavaScript under `dist/commands/`. After editing a `.ts` command, run `npm run build` before invoking it. A failed reload keeps the previous active command collection. Successful reloads also refresh the in-memory command registration data. Reload does not push updated slash-command schemas to Discord or update other shards; restart the bot to deploy schema changes and update every shard. Rebuilding while running can briefly remove `dist/`, so wait for the build to finish before reloading. Restart after changing shared helpers, event handlers, or configuration.
+
+## Docker
+
+The Docker build compiles TypeScript in a build stage and installs only production dependencies in the runtime stage.
+
 ```bash
 docker build -t discord-bot .
+docker run -d --name my-discord-bot -e DISCORD_TOKEN discord-bot
 ```
 
-2. Run the container:
-```bash
-docker run -d --name my-discord-bot discord-bot
+Set `DISCORD_TOKEN` in the host environment first. Configuration edits require rebuilding the image. The container runs as the unprivileged `node` user in production mode.
+
+## Project structure
+
+```text
+commands/
+  admin/{purge,reload}.ts
+  public/{ping,serverinfo,userinfo}.ts
+events/
+  clientReady.ts
+  guildMemberAdd.ts
+  guildMemberRemove.ts
+  interactionCreate.ts
+function/logger.ts
+handlers/
+  command.ts
+  events.ts
+bot.ts                   # Client with typed command collections
+client.ts                # Client startup and login
+config.ts                # Typed configuration
+index.ts                 # Sharding manager
+types.ts                # Shared command, event, and configuration contracts
+tests/bot.test.ts         # Offline behavior tests
+tsconfig.json
+MIGRATION_PLAN.md
+MIGRATION_REPORT.md
 ```
 
-## Project Structure
+## Adding a command
 
-```
-discordbot/
-├── commands/
-│   ├── admin/          # Admin-only commands
-│   │   ├── purge.js    # Bulk delete messages
-│   │   ├── warn.js     # Warn users
-│   │   └── reload.js   # Reload commands
-│   └── public/         # Public commands
-│       ├── ping.js     # Check bot latency
-│       ├── serverinfo.js  # Display server information
-│       └── userinfo.js    # Display user information
-├── events/
-│   ├── clientReady.js        # Bot ready event
-│   ├── guildMemberAdd.js     # New member join event
-│   ├── guildMemberRemove.js  # Member leave event
-│   └── interactionCreate.js  # Handle slash commands
-├── function/
-│   └── logger.js       # Custom logging utility
-├── handlers/
-│   ├── command.js      # Command loader
-│   └── events.js       # Event loader
-├── client.js           # Client initialization
-├── index.js            # Sharding manager entry point
-├── config.js           # Bot configuration
-├── package.json
-└── Dockerfile
-```
+Create a `.ts` file below `commands/`, then rebuild. The loader discovers compiled `.js` command modules recursively.
 
-## Available Commands
+```typescript
+import { SlashCommandBuilder } from "discord.js";
+import type { Command } from "../../types";
 
-### Public Commands
-- `/ping` - Check bot latency (shows WebSocket and interaction latency)
-- `/serverinfo` - Display server information
-- `/userinfo` - Display user information
-
-### Admin Commands (Requires Permissions)
-- `/purge <amount>` - Delete 1-100 messages in a channel (Requires: Manage Messages)
-- `/warn <user>` - Warn a user (Requires: Moderate Members)
-- `/reload` - Reload bot commands (Developer only)
-
-## Features in Detail
-
-### Sharding
-The bot uses Discord.js ShardingManager for horizontal scaling across multiple processes. Configure the number of shards in `config.js`:
-
-```javascript
-shard: "auto"  // Automatically determine shard count
-// or
-shard: 2       // Use specific number of shards
-```
-
-### Event System
-Events are automatically loaded from the `events/` directory. Each event file exports a function that receives the client instance.
-
-### Command Handler
-Commands are organized into categories (admin/public) and automatically loaded on startup. The handler system supports:
-- Automatic command registration
-- Global or guild-specific deployment
-- Permission checking
-- Developer-only commands
-
-### Logger
-Custom color-coded logger with multiple levels:
-- `logger.info()` - General information (cyan)
-- `logger.success()` - Success messages (green)
-- `logger.warning()` - Warnings (yellow)
-- `logger.error()` - Errors (red)
-- `logger.debug()` - Debug information (blue)
-
-### Auto Role
-Automatically assigns a role to new members when they join the server. Configure `autoRoleId` in `config.js`.
-
-### Logging Channel
-Member join/leave events are logged to a specified channel. Configure `logChannelId` in `config.js`.
-
-## Configuration Options
-
-| Option | Type | Description | Default |
-|--------|------|-------------|---------|
-| `token` | String | Discord bot token | Required |
-| `pushcommand` | Boolean | Auto-deploy commands on startup | `true` |
-| `pushGlobal` | Boolean | Deploy commands globally | `true` |
-| `guildPushCommand` | String/Array | Guild IDs for command deployment | `""` |
-| `developerId` | String | Developer user ID for restricted commands | Required |
-| `autoRoleId` | String | Role ID to assign to new members | Optional |
-| `logChannelId` | String | Channel ID for logging events | Optional |
-| `shard` | Number/String | Number of shards or "auto" | `1` |
-
-## Gateway Intents
-
-The bot uses the following intents:
-- `Guilds` - Access to guild information
-- `GuildMembers` - Member join/leave events
-- `GuildMessages` - Message-related events
-- `MessageContent` - Access to message content
-- `GuildMessageReactions` - Reaction events
-- `DirectMessages` - DM support
-
-## Creating Custom Commands
-
-### Public Command Example
-Create a new file in `commands/public/`:
-
-```javascript
-const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-
-module.exports = {
+const command: Command = {
     data: new SlashCommandBuilder()
         .setName("example")
         .setDescription("Example command"),
-
     async run(client, interaction) {
-        const embed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle("Example")
-            .setDescription("This is an example command");
-
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply("Hello!");
     },
 };
+
+export = command;
 ```
 
-### Admin Command Example
-Create a new file in `commands/admin/`:
+Use `interaction.isChatInputCommand()` when routing slash commands and check nullable guild/channel state in command implementations. The shared command interface supplies the chat-input interaction type automatically.
 
-```javascript
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+## Adding an event
 
-module.exports = {
-    data: new SlashCommandBuilder()
-        .setName("adminexample")
-        .setDescription("Admin command example")
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+Create an event file using the event's exact Discord name:
 
-    async run(client, interaction) {
-        // Command logic here
-        await interaction.reply("Admin command executed!");
-    },
+```typescript
+// events/messageCreate.ts
+import type { BotEvent } from "../types";
+
+const event: BotEvent<"messageCreate"> = async (client, message) => {
+    if (message.author.bot) return;
+    // Handle the typed message here.
 };
+
+export = event;
 ```
 
-## Creating Custom Events
+Import it in `handlers/events.ts` and add `register("messageCreate", messageCreate)` alongside the existing registrations. This explicit registry checks event names and payload types at compile time. Event failures are caught and logged by the registry.
 
-Create a new file in `events/`:
+## Logging and troubleshooting
 
-```javascript
-module.exports = (client) => {
-    client.on("eventName", async (...args) => {
-        // Event handler logic
-    });
-};
-```
+The logger supports `debug`, `info`, `warning`, `danger`, `error`, and `success`; `debug` only prints in development. Member join events optionally assign a role, and join/leave events send embeds to the configured channel.
 
-## Troubleshooting
+If commands do not appear, check the bot's `applications.commands` scope and command deployment configuration. If an operation fails, check the bot's permissions and role hierarchy. `/purge` filters out messages older than 14 days. Member counts in `/serverinfo` use the member cache and may not include every member.
 
-### Bot not responding to commands
-- Ensure the bot has the `applications.commands` scope
-- Check if commands are deployed (set `pushcommand: true`)
-- Verify the bot has necessary permissions in the server
+The offline suite makes no Discord requests. A real token and test guild are needed to verify login, shard spawning, command registration, permissions, and member events against Discord.
 
-### Missing permissions error
-- Grant the bot appropriate role permissions
-- Check channel-specific permission overrides
-- Ensure the bot's role is higher than roles it needs to manage
+## Migration documentation
 
-### Sharding issues
-- Use `"auto"` for shard count initially
-- Ensure sufficient memory for multiple shards
-- Check Discord API documentation for shard limits
+See [the migration plan](MIGRATION_PLAN.md) for the initial review and ordered steps, and [the completion report](MIGRATION_REPORT.md) for implementation details, verification results, and remaining limitations.
 
-## Dependencies
+## Dependencies and metadata
 
-- **discord.js** (^14.25.1) - Discord API wrapper
-- **colors** (^1.4.0) - Terminal color output
-- **cross-env** (^10.1.0) - Cross-platform environment variables
+Runtime dependencies: `discord.js`, `colors`, and `cross-env`. Development dependencies: TypeScript and Node.js type declarations. `package-lock.json` records the exact installed versions.
 
-## License
-
-This project is unlicensed. Please add an appropriate license for your use case.
-
-## Author
-
-**dekthaiinchina**
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Support
-
-For issues and questions, please open an issue in the repository.
-
----
-
-**Note:** Remember to keep your bot token secure and never commit it to version control. Consider using environment variables or a `.env` file for sensitive information.
+Author: **dekthaiinchina**. Package metadata declares MIT; no standalone license file is included.

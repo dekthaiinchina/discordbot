@@ -1,8 +1,8 @@
-const { ShardingManager } = require("discord.js");
+import { ShardingManager } from "discord.js";
 
-const path = require("path");
-const config = require("./config");
-const logger = require("./function/logger");
+import path from "path";
+import config from "./config";
+import logger from "./function/logger";
 
 const manager = new ShardingManager(
     path.join(__dirname, "client.js"),
@@ -22,4 +22,7 @@ manager.spawn({
     amount: manager.totalShards,
     delay: 10000,
     timeout: -1,
+}).catch(error => {
+    logger.error(error);
+    process.exitCode = 1;
 });

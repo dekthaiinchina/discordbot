@@ -1,11 +1,13 @@
-const { GatewayIntentBits } = require("discord.js");
+import { GatewayIntentBits } from "discord.js";
+import { version } from "./package.json";
+import type { BotConfig } from "./types";
 
-const baseConfig = {
-    version: require("./package.json").version,
-    token: "",
+const baseConfig: Omit<BotConfig, "intents"> = {
+    version,
+    token: process.env.DISCORD_TOKEN ?? "",
     pushcommand: true,
     pushGlobal: true,
-    guildPushCommand: "",
+    guildPushCommand: [],
     developerId: "",
     autoRoleId: "",
     logChannelId: "",
@@ -32,4 +34,5 @@ const config = {
     },
 };
 
-module.exports = config[process.env.NODE_ENV === "development" ? "development" : "production"];
+const selectedConfig: BotConfig = config[process.env.NODE_ENV === "development" ? "development" : "production"];
+export = selectedConfig;

@@ -1,12 +1,9 @@
-const { EmbedBuilder, MessageFlags } = require("discord.js");
+import type { BotEvent } from "../types";
+import { EmbedBuilder } from "discord.js";
 
-const config = require("../config");
+import config from "../config";
 
-/**
- * @param {import("discord.js").Client} client
- * @param {import("discord.js").GuildMember} member
- */
-module.exports = async (client, member) => {
+const event: BotEvent<"guildMemberAdd"> = async (client, member) => {
     const autoRoleId = config.autoRoleId || "";
     const logChannelId = config.logChannelId || "";
     try {
@@ -19,7 +16,7 @@ module.exports = async (client, member) => {
     }
 
     const channel = member.guild.channels.cache.get(logChannelId);
-    if (!channel) return;
+    if (!channel?.isSendable()) return;
 
     const createdAt = `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`;
     const embed = new EmbedBuilder()
@@ -51,8 +48,8 @@ module.exports = async (client, member) => {
         .setFooter({ text: `Members: ${member.guild.memberCount}` })
         .setTimestamp();
 
-    channel.send({
+    await channel.send({
         embeds: [embed],
-        flags: MessageFlags.Ephemeral,
     });
 };
+export = event;

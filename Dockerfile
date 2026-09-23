@@ -1,17 +1,15 @@
-# Use the official Node.js 20 LTS image as the base
-FROM node:lts-trixie-slim
-
-# Create and change to the app directory
+FROM node:24-trixie-slim AS build
 WORKDIR /usr/src/app
-
-# Copy package files first to leverage Docker cache for layers
 COPY package*.json ./
-
-# Install production dependencies only
-RUN npm install
-
-# Copy the rest of your bot's source code
+RUN npm ci
 COPY . .
+RUN npm run build
 
-# Use the production script defined in your package.json
-CMD ["npm", "run", "dev"]
+FROM node:24-trixie-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /usr/src/app
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build /usr/src/app/dist ./dist
+USER node
+CMD ["npm", "start"]

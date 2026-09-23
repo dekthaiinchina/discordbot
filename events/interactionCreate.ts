@@ -1,13 +1,10 @@
-const { InteractionType, MessageFlags } = require("discord.js");
+import type { BotEvent } from "../types";
+import { MessageFlags } from "discord.js";
 
-const logger = require("../function/logger");
+import logger from "../function/logger";
 
-/**
- * @param {import("discord.js").Client} client
- * @param {import("discord.js").Interaction} interaction
- */
-module.exports = async (client, interaction) => {
-    if (interaction.type !== InteractionType.ApplicationCommand) return;
+const event: BotEvent<"interactionCreate"> = async (client, interaction) => {
+    if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);
     if (!command) {
@@ -37,3 +34,4 @@ module.exports = async (client, interaction) => {
         }
     }
 };
+export = event;
